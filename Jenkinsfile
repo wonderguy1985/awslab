@@ -5,7 +5,7 @@ node {
    }
    stage('Build') {
       // Run the maven build
-      sh '/usr/local/bin/packer version'
+      sh 'docker version'
    }
    stage('Results') {
       sh 'echo finish'
