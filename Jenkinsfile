@@ -1,72 +1,33 @@
 pipeline {
-  agent {
-    docker {
-      image 'node:10-alpine'
-      args '-p 20001-20100:3000'
-    }
-
-  }
-  stages {
-    stage('Install Packages') {
-      steps {
-        sh 'npm install'
-      }
-    }
-
-    stage('Test and Build') {
-      parallel {
-        stage('Run Tests') {
-          steps {
-            sh 'npm run test'
-          }
-        }
-
-        stage('Create Build Artifacts') {
-          steps {
-            sh 'npm run build'
-          }
-        }
-
-      }
-    }
-
-    stage('Deployment') {
-      parallel {
-        stage('Staging') {
-          when {
-            branch 'staging'
-          }
-          steps {
-            withAWS(region: '<your-bucket-region>', credentials: '<AWS-Staging-Jenkins-Credential-ID>') {
-              s3Delete(bucket: '<bucket-name>', path: '**/*')
-              s3Upload(bucket: '<bucket-name>', workingDir: 'build', includePathPattern: '**/*')
-            }
-
-            mail(subject: 'Staging Build', body: 'New Deployment to Staging', to: 'jenkins-mailing-list@mail.com')
-          }
-        }
-
-        stage('Production') {
-          when {
-            branch 'master'
-          }
-          steps {
-            withAWS(region: '<your-bucket-region>', credentials: '<AWS-Production-Jenkins-Credential-ID>') {
-              s3Delete(bucket: '<bucket-name>', path: '**/*')
-              s3Upload(bucket: '<bucket-name>', workingDir: 'build', includePathPattern: '**/*')
-            }
-
-            mail(subject: 'Production Build', body: 'New Deployment to Production', to: 'jenkins-mailing-list@mail.com')
-          }
-        }
-
-      }
-    }
-
-  }
+  agent any
   environment {
-    CI = 'true'
-    HOME = '.'
-    npm_config_cache = 'npm-cache'
+     AWS_DEFAULT_REGION = 'us-east-1'
   }
-}
+
+  stages {
+    stage('Validate & lint') {
+      parallel {
+        stage('packer validate') {
+          agent {
+            docker {
+              image 'simonmcc/hashicorp-pipeline:latest'
+              alwaysPull true
+            }
+          }
+          steps {
+            checkout scm
+            wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm']) {
+              sh "packer validate ./base/base.json"
+              sh "AMI_BASE=ami-fakefake packer validate app/app.json"
+            }
+          }
+        }
+        stage('terraform fmt') {
+          agent { docker { image 'simonmcc/hashicorp-pipeline:latest' } }
+          steps {
+            checkout scm
+            sh "terraform fmt -check=true -diff=true"
+          }
+        }
+      }
+    }
