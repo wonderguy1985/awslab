@@ -5,7 +5,7 @@ node {
    }
    stage('Build') {
       // Run the maven build
-      sh 'docker version'
+      sh 'sudo docker version'
    }
    stage('Results') {
       sh 'echo finish'
