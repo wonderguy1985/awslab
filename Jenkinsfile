@@ -5,7 +5,7 @@ node {
    }
    stage('Build') {
       // Run the maven build
-      sh '/usr/local/bin/packer build -var aws_access_key=$aws_access_key ./aws2.json'
+      sh '/usr/local/bin/packer version'
    }
    stage('Results') {
       sh 'echo finish'
